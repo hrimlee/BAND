@@ -1,0 +1,44 @@
+name: retriever
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+  - defaults
+
+dependencies:
+  # Python
+  - python=3.10
+
+  # PyTorch + CUDA (adjust cuda version to match target cluster)
+  - pytorch=2.1.0
+  - pytorch-cuda=12.1
+  - torchtriton=2.1.0
+
+  # FAISS (GPU version; use faiss-cpu if no GPU)
+  - faiss-gpu=1.9.0
+
+  # Core scientific
+  - numpy=1.26.4
+  - scipy
+
+  # HuggingFace
+  - pip:
+    - transformers==4.44.2
+    - huggingface_hub
+    - tokenizers
+    - accelerate
+    - sentencepiece
+
+    # Retriever / NLP
+    - sentence-transformers
+    - scispacy==0.5.3
+    - spacy==3.6.*
+    - nmslib
+
+    # Inference utilities
+    - tqdm
+    - scikit-learn
+
+    # Jupyter (optional, install separately if needed)
+    # - jupyterlab
+    # - ipykernel
