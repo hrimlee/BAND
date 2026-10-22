@@ -1,171 +1,202 @@
-This repository contains the implementation of a retrieval-level debiasing method built on top of the RAG² pipeline ([Jeong et al., 2024](https://arxiv.org/abs/2408.02076)).
+# BAND: Bias-Aware Retrieval Debiasing for Demographic Robustness in Retrieval-Augmented Medical Question Answering
 
-## Quick Access: Reproduce Our Results
+**Official implementation of BAND**, accepted at the **GroundLM Workshop @ EMNLP 2026**.
 
-Download the perturbed evaluation dataset and pre-built debiasing encoder, then run inference directly.
+BAND (**Bias-Aware Neutral Debiasing**) is a rotation-based retrieval debiasing framework for improving demographic robustness in retrieval-augmented medical question answering. It mitigates **retrieval shift**—the tendency of demographic perturbations to steer retrieval toward demographically correlated but clinically irrelevant evidence—while preserving clinically relevant retrieval behavior.
 
-**1. Download perturbed dataset** ([link](https://drive.google.com/drive/folders/1wgDFKKpCqTUrGsvVrQepGoBK0Qz0rHJV))
+## Main Results
 
-Place the downloaded files under `perturb_dataset/`.
+Results on the ethnicity-perturbed MedQA test set (five ethnicity groups; 5,575 perturbed test instances):
 
-**2. Download pre-trained debiasing encoder** ([link](https://drive.google.com/file/d/1mkkQzMiwKGM0XK2Hxz7UTGIrOlEbLS7d/view?usp=sharing))
+| Method | Overall Accuracy ↑ | DP Gap ↓ | Flip Rate ↓ | Retrieval Consistency ↑ |
+|:--|--:|--:|--:|--:|
+| RAG² | **61.47** | 1.35 | 11.89 | 0.26 |
+| **BAND** | 61.24 | **1.26** | **10.69** | **0.30** |
 
-Place the downloaded model under `outputs/medcpt_debias_merged/` and set `--encoder_path outputs/medcpt_debias_merged`.
+BAND reduces demographic sensitivity while maintaining accuracy comparable to RAG². Evidence-level analysis also shows lower **BiasedEvidence** (6.33 vs. 10.01), **AttrRate** (1.38 vs. 2.06), and **DiffDocs** (86.21 vs. 88.07).
 
-**3. Run inference with our debiasing encoder**
+## Quick Start
 
-```bash
-python inference.py \
-    --input_path        perturb_dataset/phrases_rethnicity_test_prefix_perturbed_p1.jsonl \
-    --output_path       results/rag2_debias_eth_p1.json \
-    --llm_path          /path/to/Meta-Llama-3-8B-Instruct \
-    --classifier_path   /path/to/flan_t5_large_trained \
-    --encoder_path      /path/to/medcpt_debias_merged \
-    --embeddings_dir    retriever/embeddings \
-    --articles_dir      retriever/articles \
-    --num_pubmed_chunks 38 \
-    --pubmed_group_num  10 \
-    --top_k             100 \
-    --top_k_final       10 \
-    --cot_cache_path    cot_cache/cot_cache_eth_p1.json \
-    --load_in_8bit \
-    --llm_batch_size    4
-```
+Use the released perturbed evaluation dataset and pretrained debiasing encoder to reproduce inference results.
 
-Repeat for `_p2` and `_p3` partitions, then evaluate:
+### 1. Download resources
 
-```bash
-python analyze/analyze_bias_propagation.py
-python analyze/analyze_flip_statistics.py
-```
+| Resource | Download | Place under |
+|:--|:--|:--|
+| Ethnicity-perturbed evaluation dataset | [Google Drive](https://drive.google.com/drive/folders/1wgDFKKpCqTUrGsvVrQepGoBK0Qz0rHJV) | `perturb_dataset/` |
+| Pretrained debiasing encoder | [Google Drive](https://drive.google.com/file/d/1mkkQzMiwKGM0XK2Hxz7UTGIrOlEbLS7d/view?usp=sharing) | `outputs/medcpt_debias_merged/` |
 
----
+Inference also requires a Llama-3-8B-Instruct model, a trained evidence-helpfulness classifier, PubMed article embeddings and articles, and a CoT cache. Set the paths below to your local resources. The dataset and encoder downloads alone are not sufficient to run inference.
 
-## Requirements
+### 2. Install dependencies
 
 ```bash
 conda env create -f environment.yml
 conda activate retriever
 ```
 
-Main dependencies: `torch`, `transformers`, `peft`, `faiss-gpu`, `numpy`
+Main dependencies include `torch`, `transformers`, `peft`, `faiss-gpu`, and `numpy`.
 
-## Project Structure
+### 3. Run inference
 
-```
-├── inference.py              # RAG² inference pipeline (CoT → retrieve → answer)
-├── train_encoder.py    # debiasing encoder training (L_sup + L_inv + L_rot)
-├── merge_lora_encoder.py     # Merge LoRA weights into base encoder
-├── generate_cot.py           # Pre-generate CoT rationales for caching
-├── rotation_debias.py           # debiasing module
-├── retriever/
-│   ├── query_encode.py       # MedCPT query encoding
-│   └── retrieve.py           # FAISS index creation and retrieval
-├── classifier/
-│   └── train_classifier.py   # Flan-T5 evidence helpfulness classifier (LoRA)
-├── analyze/
-│   ├── analyze_bias_propagation.py    # Biased Evidence %, Attraction Rate %
-│   ├── analyze_flip_statistics.py     # Flip rate, Answer Stability
-│   └── analyze_retrieval_consistency.py  # Jaccard retrieval consistency
-└── scripts/
-    ├── train_encoder.sh         # SLURM: train debiasing encoder
-    ├── merge_encoder.sh       # SLURM: merge LoRA weights
-    └── run_inference.sh       # SLURM: run RAG² inference
+```bash
+python inference.py \
+    --input_path perturb_dataset/phrases_rethnicity_test_prefix_perturbed_p1.jsonl \
+    --output_path results/rag2_debias_eth_p1.json \
+    --llm_path /path/to/Meta-Llama-3-8B-Instruct \
+    --classifier_path /path/to/flan_t5_large_trained \
+    --encoder_path outputs/medcpt_debias_merged \
+    --embeddings_dir retriever/embeddings \
+    --articles_dir retriever/articles \
+    --num_pubmed_chunks 38 \
+    --pubmed_group_num 10 \
+    --top_k 100 \
+    --top_k_final 10 \
+    --cot_cache_path cot_cache/cot_cache_eth_p1.json \
+    --load_in_8bit \
+    --llm_batch_size 4
 ```
 
-## Step-by-Step Usage
+Repeat inference for the `_p2` and `_p3` partitions, updating the input, output, and cache paths accordingly.
 
-### 1. Build Debiaser
+### 4. Evaluate
 
-Encode demographic group directions from the base MedCPT encoder:
+```bash
+python analyze/analyze_bias_propagation.py
+python analyze/analyze_flip_statistics.py
+python analyze/analyze_retrieval_consistency.py
+```
+
+## Training from Scratch
+
+### Step 1. Construct the demographic debiaser
+
+Compute demographic directions from the pretrained MedCPT query encoder.
 
 ```bash
 python rotation_debias.py \
     --encoder_path /path/to/MedCPT-Query-Encoder \
-    --output_path  rotation_debiaser.npz \
+    --output_path rotation_debiaser.npz \
     --concepts race gender
 ```
 
-### 2. Train Classifier (Flan-T5 evidence helpfulness)
+### Step 2. Train the evidence-helpfulness classifier
 
 ```bash
 python classifier/train_classifier.py \
-    --model_path  /path/to/flan-t5-large \
-    --train_file  data/classifier_train_labeled.json \
-    --output_dir  outputs/flan_t5_classifier \
-    --epochs 40 --lora_r 16
+    --model_path /path/to/flan-t5-large \
+    --train_file data/classifier_train_labeled.json \
+    --output_dir outputs/flan_t5_classifier \
+    --epochs 40 \
+    --lora_r 16
 ```
 
-### 3. Train Debiasing Encoder
+### Step 3. Train the debiasing encoder
 
-Fine-tunes MedCPT with three losses: `L_sup` (InfoNCE in rotation space), `L_inv` (demographic invariance), `L_rot` (geometric alignment).
+BAND combines a supervised retrieval objective (`L_sup`), a demographic-invariance objective (`L_inv`), and a rotation-alignment objective (`L_rotate`).
 
 ```bash
 python train_encoder.py \
-    --encoder_path              /path/to/MedCPT-Query-Encoder \
-    --debiaser_path             rotation_debiaser.npz \
-    --classifier_labeled_path   data/classifier_train_labeled.json \
+    --encoder_path /path/to/MedCPT-Query-Encoder \
+    --debiaser_path rotation_debiaser.npz \
+    --classifier_labeled_path data/classifier_train_labeled.json \
     --perturb_train_files \
         perturb_dataset/phrases_ethnicity_train_perturbed.jsonl \
         perturb_dataset/phrases_gender_train_perturbed.jsonl \
-    --output_dir  outputs/medcpt_debias \
-    --epochs 5 --warmup_epochs 1 \
-    --lambda_supervised 1.0 --lambda_inv 0.1 --lambda_rot 0.01 \
-    --use_lora --lora_r 16 --lora_alpha 32 --gradient_checkpointing
+    --output_dir outputs/medcpt_debias \
+    --epochs 5 \
+    --warmup_epochs 1 \
+    --lambda_supervised 1.0 \
+    --lambda_inv 0.1 \
+    --lambda_rot 0.01 \
+    --use_lora \
+    --lora_r 16 \
+    --lora_alpha 32 \
+    --gradient_checkpointing
 ```
 
-### 4. Merge LoRA Weights
+**Implementation notes**
+
+- The supervised retrieval loss matches the rotated query representation `R(f(q))` with positive evidence representations.
+- The document index uses the base MedCPT Article Encoder and is not rotated.
+- Only `L_sup` is active during the first warmup epoch; `L_inv` and `L_rotate` are introduced afterward.
+
+### Step 4. Merge LoRA weights
 
 ```bash
 python merge_lora_encoder.py \
-    --base_path  /path/to/MedCPT-Query-Encoder \
-    --lora_path  outputs/medcpt_debias/best \
+    --base_path /path/to/MedCPT-Query-Encoder \
+    --lora_path outputs/medcpt_debias/best \
     --output_dir outputs/medcpt_debias_merged
 ```
 
-### 5. Run Inference
+### Step 5. Run inference with the trained encoder
 
 ```bash
 python inference.py \
-    --input_path        data/medqa_test.jsonl \
-    --output_path       results/rag2_debias_results.json \
-    --llm_path          /path/to/Meta-Llama-3-8B-Instruct \
-    --classifier_path   outputs/flan_t5_classifier \
-    --encoder_path      outputs/medcpt_debias_merged \
-    --embeddings_dir    retriever/embeddings \
-    --articles_dir      retriever/articles \
-    --top_k 100 --top_k_final 10 \
-    --load_in_8bit --llm_batch_size 4
+    --input_path data/medqa_test.jsonl \
+    --output_path results/rag2_debias_results.json \
+    --llm_path /path/to/Meta-Llama-3-8B-Instruct \
+    --classifier_path outputs/flan_t5_classifier \
+    --encoder_path outputs/medcpt_debias_merged \
+    --embeddings_dir retriever/embeddings \
+    --articles_dir retriever/articles \
+    --top_k 100 \
+    --top_k_final 10 \
+    --load_in_8bit \
+    --llm_batch_size 4
 ```
 
-### 6. Evaluate Bias Metrics
+## Evaluation Dataset and Metrics
 
-```bash
-# Bias propagation (Biased Evidence %, Attraction Rate %)
-python analyze/analyze_bias_propagation.py
+We construct an ethnicity-perturbed MedQA benchmark by filtering out questions where ethnicity could change the correct answer, then prepending standardized ethnicity statements to the retained questions. The benchmark includes five groups: **Caucasian, African American, Hispanic, Asian, and Native American**.
 
-# Flip rate & Answer Stability
-python analyze/analyze_flip_statistics.py
+The resulting benchmark contains **44,720 training**, **5,600 development**, and **5,575 test** perturbed instances. The test split is reserved for evaluation.
 
-# Retrieval Consistency
-python analyze/analyze_retrieval_consistency.py
+| Metric | Definition |
+|:--|:--|
+| **Accuracy** ↑ | Answer accuracy for each ethnicity group and overall |
+| **DP Gap** ↓ | Highest minus lowest ethnicity-group accuracy |
+| **Flip Rate** ↓ | Fraction of originally correct answers that become incorrect after perturbation |
+| **Retrieval Consistency** ↑ | Mean Jaccard similarity between retrieved document sets for original and perturbed queries |
+| **BiasedEvidence** ↓ | Percentage of perturbed queries whose retrieved evidence contains any demographic terms from the predefined lexicon |
+| **AttrRate** ↓ | Percentage of perturbed queries whose retrieved evidence contains terms associated with the injected ethnicity |
+| **DiffDocs** ↓ | Percentage of perturbed queries whose retrieved document set differs from the original |
+
+`BiasedEvidence` and `AttrRate` are computed using deterministic keyword matching, not classifier or human judgments.
+
+## Project Structure
+
+```text
+.
+├── inference.py                         # RAG inference pipeline
+├── train_encoder.py                     # Debiasing encoder training
+├── merge_lora_encoder.py                # Merge LoRA weights
+├── generate_cot.py                      # CoT rationale caching
+├── rotation_debias.py                   # Rotation-based debiasing module
+├── retriever/
+│   ├── query_encode.py                  # MedCPT query encoding
+│   └── retrieve.py                      # FAISS index and retrieval
+├── classifier/
+│   └── train_classifier.py              # Evidence-helpfulness classifier
+├── analyze/
+│   ├── analyze_bias_propagation.py      # Evidence bias and attraction
+│   ├── analyze_flip_statistics.py       # Flip rate and answer stability
+│   └── analyze_retrieval_consistency.py # Jaccard retrieval consistency
+└── scripts/
+    ├── train_encoder.sh                 # SLURM encoder training
+    ├── merge_encoder.sh                 # SLURM LoRA merge
+    └── run_inference.sh                 # SLURM inference
 ```
 
+## Citation
 
-Key design choices:
-- **L_sup uses the post-rotation query**: `R(f(q))` is matched against `f(d+)`, ensuring training aligns with inference (where queries are always debiased before retrieval).
-- **Document embeddings are not rotated**: The document index is built from the base MedCPT Article Encoder and remains unchanged.
-- **L_inv and L_rot are disabled during warmup**: Only `L_sup` is active in the first epoch for stable initialization.
+If you find this repository useful, please cite our paper:
 
-## Perturbed Evaluation Dataset
+> Harim Lee, Dasom Lee, and Chaehyun Ryu. **BAND: Bias-Aware Retrieval Debiasing for Demographic Robustness in Retrieval-Augmented Medical Question Answering.** GroundLM Workshop @ EMNLP 2026.
 
-The evaluation dataset is available at: (link)[https://drive.google.com/drive/folders/1wgDFKKpCqTUrGsvVrQepGoBK0Qz0rHJV]
+*BibTeX will be added when the official proceedings entry is available.*
 
-Demographic perturbation prepends a single sentence (e.g., "The patient is of Caucasian descent.") to clinical questions. The dataset covers:
-- **Ethnicity**: 5 groups × 1,115 questions = 5,575 perturbed pairs
+## Acknowledgements
 
-Fairness metrics:
-- **DP Gap**: max(acc per group) − min(acc per group) across perturbed groups
-- **Flip Rate**: fraction of originally-correct questions answered incorrectly after perturbation
-- **Retrieval Consistency**: Jaccard similarity between retrieved docs for original vs. perturbed queries
-
+This implementation builds on the **RAG²** pipeline introduced in *Rationale-Guided Retrieval Augmented Generation for Medical Question Answering* (Sohn et al., 2025), particularly its evidence-labeling and relevance-filtering components. We thank the authors for making their work available.
