@@ -2,7 +2,7 @@
 
 **Official implementation of BAND**, accepted at the **GroundLM Workshop @ EMNLP 2026**.
 
-[![Hugging Face Dataset](https://img.shields.io/badge/🤗%20Hugging%20Face-Dataset-yellow)](https://huggingface.co/datasets/hrimlee/BAND-MedQA)
+[![Hugging Face Dataset](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Dataset-yellow)](https://huggingface.co/datasets/hrimlee/BAND-MedQA) [![Hugging Face Model](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Model-yellow)](https://huggingface.co/hrimlee/BAND-MedCPT)
 
 BAND (**Bias-Aware Neutral Debiasing**) is a rotation-based retrieval debiasing framework for improving demographic robustness in retrieval-augmented medical question answering. It mitigates **retrieval shift**—the tendency of demographic perturbations to steer retrieval toward demographically correlated but clinically irrelevant evidence—while preserving clinically relevant retrieval behavior.
 
@@ -21,15 +21,22 @@ BAND reduces demographic sensitivity while maintaining accuracy comparable to RA
 
 Use the released perturbed evaluation dataset and pretrained debiasing encoder to reproduce inference results.
 
+### 1. Download resources
 
-### 1. Download Resources
-
-Download the following resources to reproduce our results.
-
-| Resource | Download | Directory |
+| Resource | Download | Place under |
 |:--|:--|:--|
-| Ethnicity-perturbed MedQA dataset | [🤗 Hugging Face](https://huggingface.co/datasets/hrimlee/BAND-MedQA) | `perturb_dataset/` |
-| Pretrained debiasing encoder | [Google Drive](https://drive.google.com/file/d/1mkkQzMiwKGM0XK2Hxz7UTGIrOlEbLS7d/view?usp=sharing) | `outputs/medcpt_debias_merged/` |
+| Ethnicity-perturbed MedQA dataset | [🤗 Hugging Face Dataset](https://huggingface.co/datasets/hrimlee/BAND-MedQA) | `perturb_dataset/` |
+| Pretrained debiasing encoder | [🤗 Hugging Face Model](https://huggingface.co/hrimlee/BAND-MedCPT) | `outputs/medcpt_debias_merged/` |
+
+Download the released resources with the Hugging Face Hub CLI (or download them from the linked pages):
+
+```bash
+pip install -U huggingface_hub
+hf download hrimlee/BAND-MedCPT --local-dir outputs/medcpt_debias_merged
+hf download hrimlee/BAND-MedQA --repo-type dataset --local-dir perturb_dataset
+```
+
+**Dataset file paths:** The Hugging Face dataset provides the train, validation, and test splits. If the downloaded files are stored under `perturb_dataset/data/`, update `--input_path` to point to the relevant JSONL file. The partitioned `_p1`, `_p2`, and `_p3` files in the example below are the original evaluation layout; they are **not** automatically created by downloading the Hugging Face dataset. To run on the released test split directly, use its actual downloaded path (e.g., `perturb_dataset/data/test.jsonl`) and adjust the output and cache paths as needed.
 
 Inference also requires a Llama-3-8B-Instruct model, a trained evidence-helpfulness classifier, PubMed article embeddings and articles, and a CoT cache. Set the paths below to your local resources. The dataset and encoder downloads alone are not sufficient to run inference.
 
